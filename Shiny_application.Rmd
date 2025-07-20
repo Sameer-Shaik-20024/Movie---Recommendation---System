@@ -1,0 +1,316 @@
+```{r}
+library(shiny)
+
+# Load precomputed data
+correlation_matrix <- readRDS("correlation_matrix.rds")
+reviews <- readRDS("reviews.rds")
+movies <- readRDS("movies.rds")
+```
+
+
+
+```{r}
+# Define recommendation function
+compute_recommendations <- function(userInput, correlation_matrix, reviews, movies) {
+  # Ensure movies exist in the correlation matrix
+  valid_movies <- userInput[userInput %in% rownames(correlation_matrix)]
+  
+  if (length(valid_movies) == 0) {
+    return(data.frame(title = character(0), message = "No valid movies found in dataset."))
+  }
+  
+  # Compute similarity
+  similarity <- rowSums(correlation_matrix[, valid_movies, drop = FALSE], na.rm = TRUE)
+  
+  # Create a data frame of correlated movies
+  correlatedMovies <- data.frame(
+    title = names(similarity),
+    correlation = similarity,
+    row.names = NULL
+  )
+  
+  # Merge with reviews and movies datasets
+  correlatedMovies <- merge(correlatedMovies, reviews, by = "title", all.x = TRUE)
+  correlatedMovies <- merge(correlatedMovies, movies, by = "title", all.x = TRUE)
+  
+  # Filter and rank movies
+  filtered_movies <- subset(correlatedMovies, mean > 3.8 & count > 150)
+  filtered_movies$weighted_score <- 0.6 * filtered_movies$correlation +
+    0.3 * filtered_movies$mean +
+    0.1 * log(filtered_movies$count + 1)
+  sorted_movies <- filtered_movies[order(-filtered_movies$weighted_score), ]
+  
+  # Exclude already watched movies
+  sorted_movies <- subset(sorted_movies, !(title %in% userInput))
+  
+  # Return top recommendations
+  return(head(sorted_movies[, c("title", "weighted_score", "count", "mean")], 10))
+}
+```
+
+
+```{r}
+library(shiny)
+library(bslib)
+
+# UI definition
+ui <- fluidPage(
+  theme = bs_theme(bootswatch = "darkly"),  # Dark theme as base
+  
+  # Custom CSS for CineScope-style fancy font and effects
+  tags$head(
+    tags$style(HTML("
+      @import url('https://fonts.googleapis.com/css2?family=Bangers&display=swap');
+      
+      body {
+        background-color: #000000; /* Black background */
+        color: #ffffff; /* White text */
+        font-family: 'Arial', sans-serif;
+      }
+      .title-panel {
+        text-align: center;
+        margin-bottom: 20px;
+        color: #ffffff;
+      }
+      .title-panel h1 {
+        font-size: 3em; /* Large font size */
+        font-weight: bold;
+        font-family: 'Bangers', cursive; /* Cinematic font */
+        background: linear-gradient(90deg, #e50914, #ffcc00); /* Red to gold gradient */
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-shadow: 2px 2px 8px rgba(255, 255, 255, 0.1); /* Subtle glow */
+        letter-spacing: 2px; /* Slight spacing for a bold effect */
+      }
+      .title-panel p {
+        font-size: 1.2em;
+        color: #ffcc00; /* Gold accent for tagline */
+      }
+      .btn-primary {
+        background-color: #e50914;
+        border-color: #e50914;
+        font-weight: bold;
+        border-radius: 25px;
+        color: #ffffff; /* White text */
+      }
+      .btn-primary:hover {
+        background-color: #b20710;
+        border-color: #b20710;
+      }
+      .btn-secondary {
+        background-color: #333333;
+        border-color: #333333;
+        color: #ffffff;
+        border-radius: 25px;
+      }
+      .btn-secondary:hover {
+        background-color: #444444;
+      }
+      .recommendation-card {
+        display: inline-block;
+        width: 200px;
+        margin: 10px;
+        padding: 15px;
+        text-align: center;
+        border-radius: 10px;
+        background-color: #222222; /* Dark gray for contrast */
+        color: #ffffff; /* White text */
+        box-shadow: 2px 2px 10px rgba(255, 255, 255, 0.2); /* Soft shadow */
+        transition: transform 0.2s ease, box-shadow 0.2s ease; /* Smooth hover effect */
+      }
+      .recommendation-card:hover {
+        transform: scale(1.05); /* Slight scaling on hover */
+        box-shadow: 0 4px 15px rgba(255, 255, 0, 0.6); /* Highlight with glow effect */
+        background-color: #333333; /* Slightly lighter background */
+      }
+      .recommendation-card h5 {
+        font-weight: bold;
+        color: #ffcc00; /* Gold for movie titles */
+        overflow: hidden; /* Hide overflowing text */
+        text-overflow: ellipsis; /* Add ellipses (...) */
+        display: -webkit-box;
+        -webkit-line-clamp: 2; /* Limit to 2 lines */
+        -webkit-box-orient: vertical;
+        white-space: normal; /* Allow text wrapping */
+      }
+      .carousel {
+        display: flex;
+        overflow-x: auto;
+        padding: 10px;
+      }
+      .carousel::-webkit-scrollbar {
+        height: 8px;
+      }
+      .carousel::-webkit-scrollbar-thumb {
+        background-color: #e50914;
+        border-radius: 10px;
+      }
+    "))
+  ),
+  
+  titlePanel(
+    div(
+      class = "title-panel",
+      tags$h1("CineScope"),
+      tags$p("Explore Your Next Favorite Movie!")
+    )
+  ),
+  
+  sidebarLayout(
+    sidebarPanel(
+      h4("Enter up to five movies:", style = "color: #ffcc00;"), # Gold for heading
+      textInput("movie1", "Movie 1:", placeholder = "e.g., Titanic"),
+      textInput("movie2", "Movie 2:", placeholder = "e.g., Inception"),
+      textInput("movie3", "Movie 3:", placeholder = "e.g., Avatar"),
+      textInput("movie4", "Movie 4:", placeholder = "e.g., The Matrix"),
+      textInput("movie5", "Movie 5:", placeholder = "e.g., Forrest Gump"),
+      actionButton("get_recommendations", "🎥 Get Recommendations", class = "btn-primary"),
+      actionButton("clear_inputs", "🧹 Clear", class = "btn-secondary")
+    ),
+    mainPanel(
+      h4("Your Recommendations:", style = "color: #ffcc00;"), # Gold for heading
+      div(class = "carousel", uiOutput("recommendations_ui")),  # Horizontal scrolling carousel
+      br(),
+      
+      # Section for Top 3 Movies by Average Rating
+      h4("Top 3 Movies Based on Average Rating:", style = "color: #ffcc00;"),
+      uiOutput("top3_movies_ui"),  # Output for top 3 movies
+      
+      # Section for Pie Chart of Top 3 Movies by Number of Ratings
+      h4("Top 3 Movies by Number of Ratings (Pie Chart):", style = "color: #ffcc00;"),
+      plotOutput("top3_pie_chart")  # Output for the pie chart
+    )
+  )
+)
+
+```
+
+```{r}
+# Server logic
+server <- function(input, output, session) {
+  # Reset inputs
+  observeEvent(input$clear_inputs, {
+    updateTextInput(session, "movie1", value = "")
+    updateTextInput(session, "movie2", value = "")
+    updateTextInput(session, "movie3", value = "")
+    updateTextInput(session, "movie4", value = "")
+    updateTextInput(session, "movie5", value = "")
+  })
+  
+  recommendations <- eventReactive(input$get_recommendations, {
+    # Combine all movie inputs into a single list
+    user_movies <- c(input$movie1, input$movie2, input$movie3, input$movie4, input$movie5)
+    user_movies <- user_movies[user_movies != ""]  # Remove empty entries
+    user_movies <- trimws(user_movies)
+    
+    if (length(user_movies) == 0) {
+      return(data.frame(title = character(0), message = "Please enter at least one movie."))
+    }
+    
+    # Get recommendations
+    compute_recommendations(user_movies, correlation_matrix, reviews, movies)
+  })
+  
+  # Render recommendations as cards in a horizontal carousel
+  output$recommendations_ui <- renderUI({
+    req(recommendations())
+    
+    # Create cards for recommendations
+    recs <- recommendations()
+    if (nrow(recs) == 0) {
+      return(h5("No recommendations found. Please try different movies!"))
+    }
+    
+    # Generate horizontal carousel of movie cards
+    card_list <- lapply(1:nrow(recs), function(i) {
+      div(
+        class = "recommendation-card",
+        title = recs$title[i],  # Tooltip with full movie title
+        h5(recs$title[i]),
+        p(sprintf("⭐ Recommendation Score: %.2f", recs$weighted_score[i]))
+      )
+    })
+    
+    do.call(tagList, card_list)
+  })
+  
+  # Render top 3 movies by average rating
+  output$top3_movies_ui <- renderUI({
+    req(recommendations())
+    
+    recs <- recommendations()
+    if (nrow(recs) == 0) {
+      return(h5("No top movies to display."))
+    }
+    
+    # Select top 3 movies based on average rating
+    top3 <- recs[order(-recs$mean), ][1:min(3, nrow(recs)), ]
+    
+    # Generate cards for top 3 movies
+    top3_cards <- lapply(1:nrow(top3), function(i) {
+      div(
+        class = "recommendation-card",
+        title = top3$title[i],  # Tooltip with full movie title
+        h5(top3$title[i]),
+        p(sprintf("⭐ Average Rating: %.2f", top3$mean[i]))
+      )
+    })
+    
+    do.call(tagList, top3_cards)
+  })
+  
+  # Render pie chart of top 3 movies by number of ratings
+  output$top3_pie_chart <- renderPlot({
+    req(recommendations())
+    
+    recs <- recommendations()
+    if (nrow(recs) == 0) {
+      return(NULL)
+    }
+    
+    # Select top 3 movies by number of ratings
+    top3 <- recs[order(-recs$count), ][1:min(3, nrow(recs)), ]
+    
+    # Create pie chart data
+    pie_values <- top3$count
+    legend_labels <- top3$title  # Use only movie titles for the legend
+    
+    # Install and load plotrix for 3D pie chart
+    if (!require(plotrix)) install.packages("plotrix")
+    library(plotrix)
+    
+    # Plot 3D pie chart
+    par(bg = "#000000", mar = c(3, 3, 3, 3))  # Black background and margins
+    pie3D(
+      pie_values, 
+      labels = sprintf("%d ratings", pie_values),  # Labels inside the pie chart
+      explode = 0.1,  # Slightly separate slices
+      main = "Top 3 Movies by Number of Ratings", 
+      col = c("#e50914", "#ffcc00", "#333333"),  # Theme colors
+      border = "#ffffff",  # White border around slices
+      labelcol = "#ffffff",  # White text for pie chart labels
+      labelcex = 0.8,  # Reduced font size for labels
+      cex.main = 1.5,  # Font size for title
+      col.main = "#ffcc00",  # Gold font for title
+      font.main = 2  # Bold font for title
+    )
+    
+    # Adjust legend position to bottom-left
+    legend(
+      "bottomleft",  # Move the legend to the bottom-left corner
+      legend = legend_labels, 
+      fill = c("#e50914", "#ffcc00", "#333333"), 
+      border = NA, 
+      text.col = "#ffcc00",  # Gold text for legend
+      bty = "n",  # No box around the legend
+      cex = 1  # Font size for legend text
+    )
+  })
+}
+
+# Run the application
+shinyApp(ui = ui, server = server)
+
+```
+
+

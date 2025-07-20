@@ -1,0 +1,338 @@
+```{r}
+# Install and load recommenderlab and data.table packages if not already installed
+if (!require("recommenderlab")) install.packages("recommenderlab")
+if (!require("data.table")) install.packages("data.table")
+
+library(recommenderlab)
+library(data.table)
+```
+
+```{r}
+# Install and load dplyr if not already installed
+if (!requireNamespace("dplyr", quietly = TRUE)) install.packages("dplyr")
+library(dplyr)
+
+```
+
+```{r}
+# Define column names
+column_movies <- c("movieId", "title", "genres")
+column_ratings <- c("userId", "movieId", "rating", "timestamp")
+
+# Try reading the files and handle potential errors
+tryCatch({
+    # Read CSV files
+    movies <- read.csv("movie.csv", header = FALSE, col.names = column_movies)
+    ratings <- read.csv("rating.csv", header = FALSE, col.names = column_ratings)
+    
+    # Calculate the mean number of movies watched per user
+    mean_movies_watched <- ratings %>%
+      group_by(userId) %>%             # Group by each user
+      summarize(movies_watched = n()) %>%  # Count the number of movies each user watched
+      summarize(mean_movies = mean(movies_watched))  # Calculate the mean
+
+    # Print the result
+    print(mean_movies_watched)
+    
+    # Count the number of unique movies watched by each user
+    user_movie_counts <- ratings %>%
+        group_by(userId) %>%
+        summarise(movies_watched = n_distinct(movieId))
+    #print(user_movie_counts)
+    
+    # Filter users who have watched more than 150 movies
+    eligible_users <- user_movie_counts %>%
+        filter(movies_watched > mean_movies_watched) %>%
+        pull(userId)
+    #print(eligible_users)
+    
+    # Randomly select 1,000 unique users
+    set.seed(123) # For reproducibility
+    selected_users <- sample(unique(ratings$userId), 2000)
+    
+    # Filter ratings to include only the selected users
+    ratings <- subset(ratings, userId %in% selected_users)
+    
+    # Process the filtered ratings as needed
+}, error = function(e) {
+    message("Error while reading the file: ", e)
+})
+
+```
+
+
+
+```{r}
+# Display the first few rows of the movies data frame
+head(movies)
+```
+
+```{r}
+head(ratings)
+```
+
+```{r}
+# Merge the movies and ratings data frames on 'movieId' using an inner join
+movie_ratings <- merge(movies, ratings, by = "movieId", all = FALSE)
+
+# Drop the 'timestamp' column
+movie_ratings$timestamp <- NULL
+
+# Display the first few rows of the merged data frame
+head(movie_ratings)
+
+
+
+```
+
+```{r}
+# Convert specified columns to numeric
+movie_ratings$movieId <- as.numeric(movie_ratings$movieId)
+movie_ratings$userId <- as.numeric(movie_ratings$userId)
+movie_ratings$rating <- as.numeric(movie_ratings$rating)
+
+# Display the first few rows of the merged data frame
+head(movie_ratings)
+
+```
+
+
+```{r}
+# Load dplyr for data manipulation
+library(dplyr)
+
+# Group by 'title', then summarize to calculate count and mean of 'rating'
+reviews <- movie_ratings %>%
+  group_by(title) %>%
+  summarize(count = n(), mean = round(mean(rating), 1))
+
+# Display the first few rows of the result
+head(reviews)
+
+```
+
+
+```{r}
+# Get the dimensions of the data frame
+dim(movie_ratings)
+
+```
+
+```{r}
+# Load the pryr package for memory usage
+if(!require(pryr)) install.packages("pryr")
+library(pryr)
+
+# Display structure of the data frame (similar to .info() in Python)
+str(movie_ratings)
+
+# Display memory usage of the data frame in bytes
+object_size(movie_ratings)
+
+```
+
+```{r}
+# Calculate summary statistics for numeric columns only
+numeric_summary <- sapply(movie_ratings[sapply(movie_ratings, is.numeric)], summary)
+
+# Round the numeric summary statistics
+rounded_summary <- round(numeric_summary, 1)
+
+# Display the rounded summary statistics
+print(rounded_summary)
+
+
+```
+
+```{r}
+# Convert columns to the specified types
+movie_ratings$movieId <- as.integer(movie_ratings$movieId)
+movie_ratings$userId <- as.integer(movie_ratings$userId)
+movie_ratings$genres <- as.factor(movie_ratings$genres)
+```
+
+```{r}
+head(movie_ratings)
+```
+
+
+```{r}
+# Load pryr for memory usage information
+if (!requireNamespace("pryr", quietly = TRUE)) install.packages("pryr")
+library(pryr)
+
+# Display structure of the data frame (data types and sample values)
+str(movie_ratings)
+
+# Calculate memory usage of the entire data frame
+total_memory <- object_size(movie_ratings)
+cat("Total memory usage of movie_ratings:", total_memory, "\n")
+
+# Calculate memory usage per column
+column_memory <- sapply(movie_ratings, function(col) object_size(col))
+column_memory
+
+```
+
+```{r}
+# Calculate the number of unique values for each column in the ratings data frame
+unique_counts <- sapply(filtered_ratings, n_distinct)
+
+# Display the result
+unique_counts
+```
+
+```{r}
+# Calculate the number of missing values for each column in the ratings data frame
+na_counts <- sapply(filtered_ratings, function(x) sum(is.na(x)))
+
+# Display the result
+na_counts
+
+```
+
+```{r}
+# Calculate the number of missing values for each column in the movie_ratings data frame
+na_counts <- sapply(movie_ratings, function(x) sum(is.na(x)))
+
+# Display the result
+na_counts
+
+```
+
+```{r}
+# Count the occurrences of each unique userId
+user_counts <- table(movie_ratings$userId)
+
+# Display the result
+head(user_counts)
+
+```
+
+
+```{r}
+# Convert to data frame
+user_counts_df <- as.data.frame(user_counts)
+colnames(user_counts_df) <- c("userId", "count")
+
+# Display the data frame
+head(user_counts_df)
+
+```
+
+```{r}
+# Count occurrences of each unique userId
+user_counts <- table(movie_ratings$userId)
+
+# Filter for userIds with a count greater than zero
+valid_user_ids <- names(user_counts[user_counts > 0])
+
+# Display the valid user IDs
+head(valid_user_ids)
+
+```
+
+```{r}
+# Filter movie_ratings to include only rows with userId in valid_user_ids
+filtered_ratings <- movie_ratings[movie_ratings$userId %in% valid_user_ids, ]
+
+# Display the first few rows of the filtered data frame
+head(filtered_ratings)
+
+```
+
+```{r}
+# Save the filtered_ratings data frame to a CSV file
+#write.csv(filtered_ratings, "filtered_ratings.csv", row.names = FALSE)
+
+```
+
+
+```{r}
+# Set the batch size
+batch_size <- 100
+
+# Calculate the total number of users
+total_users <- length(valid_user_ids)
+
+# Calculate the number of batches needed
+num_batches <- ceiling(total_users / batch_size)
+
+# Display the number of batches
+num_batches
+
+```
+
+```{r}
+# Load necessary libraries
+if (!requireNamespace("reshape2", quietly = TRUE)) install.packages("reshape2")
+library(reshape2)
+
+# Initialize the list to store batches
+user_rating_list <- list()
+
+# Loop through each batch
+for (i in 0:(num_batches - 1)) {
+  start_index <- i * batch_size + 1
+  end_index <- min((i + 1) * batch_size, length(valid_user_ids))
+  batch_users <- valid_user_ids[start_index:end_index]
+  
+  cat("Running batch no:", i, "\n")
+  
+  # Filter the data for users in the current batch
+  batch_data <- filtered_ratings[filtered_ratings$userId %in% batch_users, ]
+  
+  # Create a cross-tabulation for the current batch
+  batch_mov <- dcast(batch_data, userId ~ title, value.var = "rating", fun.aggregate = sum)
+  
+  cat("Appending batch no (", i, ") to the list\n")
+  user_rating_list[[i + 1]] <- batch_mov  # Append each batch to the list
+}
+
+cat("Before concatenation\n")
+
+```
+
+
+```{r}
+# Load dplyr for bind_rows
+if (!requireNamespace("dplyr", quietly = TRUE)) install.packages("dplyr")
+library(dplyr)
+
+# Concatenate all batches into a single data frame
+user_rating <- bind_rows(user_rating_list)
+
+```
+
+```{r}
+# Assuming `user_rating` is your dataframe
+colnames(user_rating)[1:20]
+
+```
+
+```{r}
+# Precompute correlations
+precompute_correlations <- function(user_rating) {
+  cor_matrix <- cor(user_rating, method = "pearson", use = "pairwise.complete.obs")
+  return(cor_matrix)
+}
+
+# Example usage
+correlation_matrix <- precompute_correlations(user_rating)
+
+```
+
+```{r}
+dim(correlation_matrix)
+```
+
+```{r}
+# Save the correlation matrix to an RDS file
+saveRDS(correlation_matrix, "correlation_matrix.rds")
+
+# Save reviews and movies datasets (used for merging recommendations)
+saveRDS(reviews, "reviews.rds")
+saveRDS(movies, "movies.rds")
+```
+
+
