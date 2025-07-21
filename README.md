@@ -39,7 +39,3 @@ This project aimed to build a personalized movie recommendation system using **U
 - Custom ranking balanced popularity and similarity, reducing bias toward blockbuster-only recommendations
 - The Shiny interface allowed for easy, dynamic interaction with real-time updates
 
-This project demonstrated that a simple collaborative filtering system, when paired with a clean UI and thoughtful ranking strategy, can deliver strong results. Future work could improve cold-start performance by combining content-based or demographic data.
-
-## GitHub
-🔗 [Repository Link](https://github.com/shallowcopper/Movie-Recommendation-System)
