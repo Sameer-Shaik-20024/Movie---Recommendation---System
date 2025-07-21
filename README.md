@@ -76,18 +76,6 @@ The interactive user interface was built using **R Shiny**, allowing users to:
 
 ---
 
-## 🤝 Team Contributions
-
-| Task                  | Members                                 |
-|-----------------------|-----------------------------------------|
-| Data Preprocessing    | Vishnu, Sai Praneeth                    |
-| Model Building        | Rishi, Achyuth                          |
-| Testing               | Jayanth, Preetham                       |
-| UI Development        | Lekha, Sumanth                          |
-| Documentation         | Praveen, Sameer                         |
-
----
-
 ## 🔗 Links
 
 - **📁 GitHub Repository:** [Movie Recommendation System](https://github.com/shallowcopper/Movie-Recommendation-System)
