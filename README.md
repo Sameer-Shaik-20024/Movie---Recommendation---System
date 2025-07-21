@@ -76,13 +76,6 @@ The interactive user interface was built using **R Shiny**, allowing users to:
 
 ---
 
-## 🔗 Links
-
-- **📁 GitHub Repository:** [Movie Recommendation System](https://github.com/shallowcopper/Movie-Recommendation-System)
-- **📽️ Project Presentation Recording:** [Watch here](https://uofh-my.sharepoint.com/personal/ryedlapa_cougarnet_uh_edu/_layouts/15/stream.aspx?id=%2Fpersonal%2Fryedlapa_cougarnet_uh_edu%2FDocuments%2FRecordings%2FMeeting%20in%20EDS%206346%20%2D%20DM%20Project%2D20241201%5F232048%2DMeeting%20Recording%2Emp4)
-
----
-
 ## 🚀 Future Work
 
 - Incorporate **content-based** and **hybrid filtering** techniques
